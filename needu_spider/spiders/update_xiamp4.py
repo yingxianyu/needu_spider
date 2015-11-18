@@ -4,9 +4,9 @@
 
 from __future__ import print_function
 import scrapy
-import needu_spider.items
 import re
 import needu_spider.db_films_save as dao
+import phantomJS
 
 '''
 此爬虫只对xiamp4爬虫爬取到的数据进行更新，
@@ -15,8 +15,8 @@ import needu_spider.db_films_save as dao
     二：更新全部电影数据详细信息，
            更新频率为每天更新一次，更新数据源（从数据库中抽取符合更新条件的数据）
            注意：由于此站点电影评分属性尤为特殊，用ajax动态加载的，由于无法分析其算法
-                      所以决定在此爬虫初始化时，调用phantomJS引擎对详细数据页面进行渲染后
-                      再进行分析抓取
+                      所以决定在此爬虫初始化时，起一个新的进程调用phantomJS引擎对详细数据页面
+                      进行渲染后再进行分析抓取
 
 Author: xianyu.ying
 Date: 2015-11-17
@@ -37,6 +37,9 @@ class update_xiamp4(scrapy.spiders.Spider):
 
         #这里先将本站原有的热播电影置空
         dao.resetHot('http://www.xiamp4.com/')
+
+        #启动新进程(在phantomJS.py中启动)调用phantomJS接口模块
+        phantomJS.call()
 
 
     #TODO(xianyu.ying): 爬虫的默认回调函数
