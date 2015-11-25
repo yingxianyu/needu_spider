@@ -127,7 +127,26 @@ def isExists(webFrom, filmId):
     except:
         logger.error(traceback.print_exc())
 
+#TODO(xianyu.ying): 根据来源网站，获取10条需要更新的数据
+@__init__
+def getTenDataToUpdate(webFrom):
+    """
+    返回[{webFromId:xxxxx},{webfromId:xxxx}]
+    """
+    datas = []
+    try:
+        datas = db.select('select webFromId from ' + table +
+                ''' where DATE_FORMAT(updatetime, '%Y%m%d') < DATE_FORMAT(SYSDATE(), '%Y%m%d')
+                and webFrom = ? LIMIT 10 ''', webFrom)
+        return datas
+    except:
+        logger.error(traceback.print_exc())
+        return datas
+
 
 if __name__ =='__main__':
     logging.basicConfig(level=logging.DEBUG)
-    print(isExists(r'http://www.xiamp4.com/', r'http://www.xiamp4.com/Html/GP22067.html'))
+
+    datas = getTenDataToUpdate('http://www.xiamp4.com/')
+    print(datas[0].webFromId)
+
