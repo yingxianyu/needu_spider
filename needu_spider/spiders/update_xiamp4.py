@@ -78,9 +78,9 @@ class update_xiamp4(scrapy.spiders.Spider):
     #TODO(xianyu.ying): 将详细页面的数据进行清洗，更新
     def __processDetailPage(self, response):
         '''
-       由于数据库模块已经封装了更新详细电影数据的方法，
-       所以这里清洗出的数据直接交由处理
-       这样在下次拿出10条数据来更新时，可以避免拿出重复数据出来
+        由于数据库模块已经封装了更新详细电影数据的方法，
+        所以这里清洗出的数据直接交由处理
+        这样在下次拿出10条数据来更新时，可以避免拿出重复数据出来
         '''
 
         self.logger.info('process update page: ' + response.url)
