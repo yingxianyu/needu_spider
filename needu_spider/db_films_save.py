@@ -57,7 +57,7 @@ def save(item):
     except:
         logger.error(item['filmid'] + ',save to db error: ' + traceback.print_exc())
 
-#TODO(xianyu.ying):根据ID值，更新数据库数据
+#TODO(xianyu.ying):根据webFrom, filmId值，更新数据库数据
 @__init__
 def update(item):
     logger.info('start update to db now: ' + item['filmid'])
@@ -68,10 +68,10 @@ def update(item):
             filmDesc = ?, score = ?, director = ?,
             download = ?, filmRemotePic = ?,
             filmLocPic = ?, updatetime = SYSDATE()
-            WHERE id = ?'''),
+            WHERE webFrom = ? and webFromId = ? '''),
             item['name'], item['year'], item['classification'], item['actor'], item['loc'],
             item['filmdesc'], item['score'], item['director'], item['download'], item['filmremotepic'],
-            item['filmlocpic'], item['id'])
+            item['filmlocpic'], item['webfrom'], item['filmid'])
 
         if row > 0:
             logger.info('update to db success ' + item['filmid'])
