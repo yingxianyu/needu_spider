@@ -18,6 +18,8 @@ class Xiamp4(scrapy.Item):
     name = scrapy.Field() #名称
     year = scrapy.Field() #上映年份
     classification = scrapy.Field() #类型
+    filmType1 = scrapy.Field() #电影类型，例：电影，电视剧，动画片
+    filmType2 = scrapy.Field() #对filmType1进一步说明，例：恐怖片，欧美剧
     actor = scrapy.Field() #主演
     loc = scrapy.Field() #地区
     filmdesc = scrapy.Field() #剧情

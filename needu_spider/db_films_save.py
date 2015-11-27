@@ -64,14 +64,15 @@ def update(item):
     try:
         row = db.update('update ' + table + ' set ' + (r'''
             filmName = ?, filmYear = ?,
+            filmType1 = ?, filmType2 = ?,
             filmType = ?, actor = ?, location = ?,
             filmDesc = ?, score = ?, director = ?,
             download = ?, filmRemotePic = ?,
             filmLocPic = ?, updatetime = SYSDATE()
             WHERE webFrom = ? and webFromId = ? '''),
-            item['name'], item['year'], item['classification'], item['actor'], item['loc'],
-            item['filmdesc'], item['score'], item['director'], item['download'], item['filmremotepic'],
-            item['filmlocpic'], item['webfrom'], item['filmid'])
+            item['name'], item['year'], item['filmType1'], item['filmType2'], item['classification'], 
+            item['actor'], item['loc'], item['filmdesc'], item['score'], item['director'], item['download'], 
+            item['filmremotepic'], item['filmlocpic'], item['webfrom'], item['filmid'])
 
         if row > 0:
             logger.info('update to db success ' + item['filmid'])

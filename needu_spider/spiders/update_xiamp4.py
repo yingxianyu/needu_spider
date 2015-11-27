@@ -154,9 +154,26 @@ class update_xiamp4(scrapy.spiders.Spider):
                 tmpStr = re.search(r'GvodUrls.*?;', tmp[0])
                 download = tmpStr.group(0)[tmpStr.group(0).index('"') + 1:-2]
 
+            #电影类型，filmType1 filmType2
+            tmp = sel.xpath(r'//*[@id="main"]/div[2]/div[@class="wz"]/a/text()').extract()
+            if tmp:
+                try:
+                    filmType1 = tmp[1].strip()                                        
+                except:
+                    filmType1 = ''                    
+                try:
+                    filmType2 = tmp[2].strip()
+                except:
+                    filmType2 = ''
+                #如果路径获取的过长，全部堆积到filmType2字段里面
+                for i in range(3, len(tmp)):
+                    filmType2 = '/' + tmp[i].strip()
+
             item['name'] = name #名称
             item['year'] = year #上映年份
             item['classification'] = classification #类型
+            item['filmType1'] = filmType1 #电影类型，例：电影，电视剧，动画片
+            item['filmType2'] = filmType2 #对filmType1的进一步说明，例：恐怖片，欧美剧
             item['actor'] = actor #主演
             item['loc'] = loc #地区
             item['filmdesc'] = filmdesc #剧情
