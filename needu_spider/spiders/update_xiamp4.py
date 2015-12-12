@@ -11,6 +11,7 @@ import time
 import urllib
 import urllib2
 
+
 '''
 此爬虫只对xiamp4爬虫爬取到的数据进行更新，
 该爬虫主要任务有：
@@ -22,29 +23,28 @@ Author: xianyu.ying
 Date: 2015-11-17
 '''
 
-class update_xiamp4(scrapy.spiders.Spider):
+class update_xiamp4(scrapy.spiders.BaseSpider):
 
     name = 'update_xiamp4'
 
     #入口请求页面地址
     start_urls = []
 
+    #处理返回状态在200-300之外的状态列表
+    handle_httpstatus_list = [404]
+
+    #下载器超时设置(s)
+    download_timeout = 2
+
     def __init__(self):
         self.logger.info('update_xiamp4 spider is starting now ...')
-
-        #这里先将本站原有的热播电影置空
-        dao.resetHot('http://www.xiamp4.com/')
-
-        #先弄10条数据需要更新的数据进去
-        datas = dao.getTenDataToUpdate('http://www.xiamp4.com/')
-        for i in datas:
-            self.start_urls.append(i.webFromId)
 
         #把首页弄进去抓取每周热播
         self.start_urls.append('http://www.xiamp4.com/')
 
-        #记录一下当前爬取了多少个数据
-        self.count = 0
+        #数据库分页统计，主要作用于依次进行爬取（防止放入重复数据）
+        self.dbPage = 0
+
 
 
     #TODO(xianyu.ying): 爬虫的默认回调函数
@@ -56,39 +56,47 @@ class update_xiamp4(scrapy.spiders.Spider):
         给pipeline管道处理，直接调用数据库模块处理
         '''
 
-        #根据已分析的首页页面结构提取节点数据
-        sel = scrapy.selector.Selector(response)
-        index = sel.xpath(r'//*[@id="main"]/div/div/div[@class="bd clearfix"]').extract()
-        if index:
-            #将获取到的节点数据，清洗出干净的数据(每周热播数据)
-            cleanData = []
-            tmp = re.findall(r'<a class="play-img".*?title=', index[0])
-            for i in tmp:
-                try:
-                    s = i[i.index('/Html') : i.index('.html') + 5]
-                    cleanData.append({'webFrom' : 'http://www.xiamp4.com/', 'filmId' : 'http://www.xiamp4.com' + s})
-                except:
-                    self.logger.error('This data can\'t to clean: ' + i)
+        self.logger.info('The engine inprogress:' + str(len(self.crawler.engine.slot.inprogress)))
+        if response.status != 404:
+            #根据已分析的首页页面结构提取节点数据
+            sel = scrapy.selector.Selector(response)
+            index = sel.xpath(r'//*[@id="main"]/div/div/div[@class="bd clearfix"]').extract()
+            if index:
+                #将获取到的节点数据，清洗出干净的数据(每周热播数据)
+                cleanData = []
+                tmp = re.findall(r'<a class="play-img".*?title=', index[0])
+                for i in tmp:
+                    try:
+                        s = i[i.index('/Html') : i.index('.html') + 5]
+                        cleanData.append({'webFrom' : 'http://www.xiamp4.com/', 'filmId' : 'http://www.xiamp4.com' + s})
+                    except:
+                        self.logger.error('This data can\'t to clean: ' + i)
 
-            #调用数据库模块更新
-            self.logger.info('Call db to update hot films ...')
-            dao.updateHot(cleanData)
+                #这里先将本站原有的热播电影置空
+                dao.resetHot('http://www.xiamp4.com/')
 
-        #根据已分析的详细页面结构判断是否需要进行下一步处理
-        else:
-            #更新电影详细数据
-            detailPage = sel.xpath(r'//*[@id="main"]/div[@class="view"]')
-            if detailPage:
-                self.__processDetailPage(response)
+                #调用数据库模块更新
+                self.logger.info('Call db to update hot films ...')
+                dao.updateHot(cleanData)
 
-                #如果当前爬取的数量达到10个(我们一次性在数据库中取10条数据来更新)
-                #那么就再取10条数据来更新，直到没有数据更新为止
-                if self.count >= 10:
-                    self.count = 0
-                    self.logger.info('get ten datas to update ...')
-                    datas = dao.getTenDataToUpdate('http://www.xiamp4.com/')
-                    for i in datas:
-                        yield scrapy.Request(i.webFromId)
+            #根据已分析的详细页面结构判断是否需要进行下一步处理
+            else:
+                #更新电影详细数据
+                detailPage = sel.xpath(r'//*[@id="main"]/div[@class="view"]')
+                if detailPage:
+                    self.__processDetailPage(response)
+
+        elif response.status == 404:
+            self.logger.warning('This url is not found: ' + response.url)
+
+        #如果引擎未完成数量小于10个(我们一次性在数据库中取100条数据来更新)
+        #那么就再取100条数据来更新，直到没有数据更新为止
+        if len(self.crawler.engine.slot.inprogress) < 10:
+            self.logger.info('get 10 datas to update ...')
+            datas = dao.getDataToUpdate('http://www.xiamp4.com/', self.dbPage)
+            self.dbPage += 1
+            for i in datas:
+                yield scrapy.Request(i.webFromId, callback=self.parse, errback=self.errBack)
 
 
     #TODO(xianyu.ying): 将详细页面的数据进行清洗，更新
@@ -100,7 +108,7 @@ class update_xiamp4(scrapy.spiders.Spider):
         '''
 
         self.logger.info('process update page: ' + response.url)
-        
+
         sel = scrapy.selector.Selector(response)
         data = sel.xpath(r'//*[@id="main"]/div[@class="view"]').extract()
 
@@ -141,7 +149,9 @@ class update_xiamp4(scrapy.spiders.Spider):
             #获取分数
             vid = response.url
             vid = vid[vid.index('/GP') + 3 : vid.index('.html')]
-            score = self.__getScore(vid, response.url) #调用封装请求获取分数
+            tmp = self.__getScore(vid, response.url) #调用封装请求获取分数
+            score = tmp[0]
+            scoreCount = tmp[1]
 
             #影片图片
             tmp = sel.xpath(r'//*[@id="main"]/div[2]/div[@class="pic"]/img/@src').extract()
@@ -158,9 +168,9 @@ class update_xiamp4(scrapy.spiders.Spider):
             tmp = sel.xpath(r'//*[@id="main"]/div[2]/div[@class="wz"]/a/text()').extract()
             if tmp:
                 try:
-                    filmType1 = tmp[1].strip()                                        
+                    filmType1 = tmp[1].strip()
                 except:
-                    filmType1 = ''                    
+                    filmType1 = ''
                 try:
                     filmType2 = tmp[2].strip()
                 except:
@@ -178,6 +188,7 @@ class update_xiamp4(scrapy.spiders.Spider):
             item['loc'] = loc #地区
             item['filmdesc'] = filmdesc #剧情
             item['score'] = score #评分
+            item['scoreCount'] = scoreCount #评分人数
             item['director'] = '' #导演(该网站无导演)
             item['webfrom'] = 'http://www.xiamp4.com/' #来源网站
             item['filmid'] = filmid #来源网站具体链接地址，可用于id用
@@ -190,8 +201,10 @@ class update_xiamp4(scrapy.spiders.Spider):
                 if isinstance(v, unicode):
                    item[k] = v.encode('utf-8')
 
-            dao.update(item)
-            self.count += 1
+            if score != -1 and download != '':
+                dao.update(item)
+            else:
+                self.logger.warning('This file has no score or download skip,' + filmid)
 
 
     #TODO(xianyu.ying): 封装一个获取分数的url请求，根据返回值计算分数
@@ -201,7 +214,7 @@ class update_xiamp4(scrapy.spiders.Spider):
         根据已经分析到的公式，我们可以计算用返回的文本计算出分数值
 
         请求地址：http://www.xiamp4.com/inc/ajax.asp?id=21946&action=videoscore&timestamp=1448546250369
-        公式：var x=parseInt(d)+parseInt(t),y=(Math.round(s / x * 10) / 10.0) || 0; 
+        公式：var x=parseInt(d)+parseInt(t),y=(Math.round(s / x * 10) / 10.0) || 0;
                     计算结果，y为分数，x为评论数
         '''
         url = ('http://www.xiamp4.com/inc/ajax.asp?id=' + vid +
@@ -211,17 +224,31 @@ class update_xiamp4(scrapy.spiders.Spider):
 
         headers = {'User-Agent' : user_agent, 'X-Request-With' : 'XMLHttpRequest', 'Referer' : Referer}
 
-        req = urllib2.Request(url, None, headers) 
-        response = urllib2.urlopen(req)
-        data = response.read()
-        data = data.replace('[', '').replace(']', '')
-
-        datas = data.split(',')  #d,t,s
-
+        y = [-1,-1]
         try:
+            req = urllib2.Request(url, None, headers)
+            response = urllib2.urlopen(req, timeout=2)
+
+            data = response.read()
+            data = data.replace('[', '').replace(']', '')
+
+            datas = data.split(',')  #d,t,s
+
             x = float(datas[0]) + float(datas[1])
-            y = round(float(datas[2]) / x * 10) / 10.0
+            y[0] = round(float(datas[2]) / x * 10) / 10.0   #评分
+            y[1] = datas[0]  #评分人数
         except:
-            y = 0
+            y[0] = -1
+            y[1] = -1
+            self.logger.warning('This film get score is time out: ' + vid)
 
         return y
+
+    #TODO(xianyu.ying): Error 回调函数
+    def errBack(self, failure):
+        self.logger.error(repr(failure))
+
+    #TODO(xianyu.ying): spider 关闭时调用函数
+    def closed(self, reason):
+        self.logger.info('spider is closing now ...')
+        self.logger.info('The engine inprogress:' + str(len(self.crawler.engine.slot.inprogress)))

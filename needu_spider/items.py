@@ -24,6 +24,7 @@ class Xiamp4(scrapy.Item):
     loc = scrapy.Field() #地区
     filmdesc = scrapy.Field() #剧情
     score = scrapy.Field() #评分
+    scoreCount = scrapy.Field() #评分人数
     director = scrapy.Field() #导演
     webfrom = scrapy.Field() #来源网站
     filmid = scrapy.Field() #来源网站影片编号

@@ -44,7 +44,7 @@ def save(item):
             hot, filmName, filmYear, filmType, actor, location,
             filmDesc, score, director, download, webFrom,
             webFromId, filmRemotePic, filmLocPic, createtime, updatetime)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSDATE(),SYSDATE())'''),
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSDATE(),DATE_ADD(SYSDATE(), INTERVAL -1 DAY))'''),
             item['flag'], item['name'], item['year'], item['classification'], item['actor'],
             item['loc'], item['filmdesc'], item['score'], item['director'], item['download'],
             item['webfrom'], item['filmid'], item['filmremotepic'], item['filmlocpic'])
@@ -66,12 +66,13 @@ def update(item):
             filmName = ?, filmYear = ?,
             filmType1 = ?, filmType2 = ?,
             filmType = ?, actor = ?, location = ?,
-            filmDesc = ?, score = ?, director = ?,
+            filmDesc = ?, score = ?, scoreCount = ?, director = ?,
             download = ?, filmRemotePic = ?,
             filmLocPic = ?, updatetime = SYSDATE()
             WHERE webFrom = ? and webFromId = ? '''),
-            item['name'], item['year'], item['filmType1'], item['filmType2'], item['classification'], 
-            item['actor'], item['loc'], item['filmdesc'], item['score'], item['director'], item['download'], 
+            item['name'], item['year'], item['filmType1'], item['filmType2'], item['classification'],
+            item['actor'], item['loc'], item['filmdesc'], item['score'], item['scoreCount'],
+            item['director'], item['download'],
             item['filmremotepic'], item['filmlocpic'], item['webfrom'], item['filmid'])
 
         if row > 0:
@@ -108,7 +109,7 @@ def resetHot(webFrom):
         if row > 0:
             logger.info(webFrom + ' reset hot sucess!')
         else:
-            logger.error(webFrom + ' reset hot error!')
+            logger.warning(webFrom + ' reset hot error or no hot film to reset!')
     except:
         logger.error(webFrom + ' : reset hot error: ' + traceback.print_exc())
 
@@ -128,17 +129,18 @@ def isExists(webFrom, filmId):
     except:
         logger.error(traceback.print_exc())
 
-#TODO(xianyu.ying): 根据来源网站，获取10条需要更新的数据
+#TODO(xianyu.ying): 根据来源网站，获取100条需要更新的数据
 @__init__
-def getTenDataToUpdate(webFrom):
+def getDataToUpdate(webFrom, page):
     """
     返回[{webFromId:xxxxx},{webfromId:xxxx}]
     """
     datas = []
     try:
+        logger.info('get data range:' + str(page * 100) + ',' + str(page * 100 + 100))
         datas = db.select('select webFromId from ' + table +
                 ''' where DATE_FORMAT(updatetime, '%Y%m%d') < DATE_FORMAT(SYSDATE(), '%Y%m%d')
-                and webFrom = ? LIMIT 10 ''', webFrom)
+                and webFrom = ? LIMIT ''' + str(page * 100)+ ''',100 ''', webFrom)
         return datas
     except:
         logger.error(traceback.print_exc())
